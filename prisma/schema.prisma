@@ -19,12 +19,15 @@ enum RoleName {
 }
 
 model AppUser {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String?
-  image     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String           @id @default(uuid())
+  email            String           @unique
+  name             String?
+  image            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  submittedItems   ContentItem[]    @relation("SubmittedBy")
+  feedbackGiven    ReviewFeedback[] @relation("FeedbackCreatedBy")
+  feedbackResolved ReviewFeedback[] @relation("FeedbackResolvedBy")
 
   // RBAC join
   roles AppUserRole[]
@@ -63,6 +66,7 @@ enum ContentType {
 
 enum ContentStatus {
   DRAFT
+  AWAITING_CHANGES
   IN_REVIEW
   APPROVED
   PUBLISHED
@@ -70,10 +74,15 @@ enum ContentStatus {
 }
 
 model ContentItem {
-  id     String        @id @default(uuid())
-  type   ContentType
-  slug   String        @unique
-  status ContentStatus @default(DRAFT)
+  id       String           @id @default(uuid())
+  type     ContentType
+  slug     String           @unique
+  status   ContentStatus    @default(DRAFT)
+  feedback ReviewFeedback[]
+
+  submittedAt       DateTime?
+  submittedByUserId String?
+  submittedBy       AppUser?  @relation("SubmittedBy", fields: [submittedByUserId], references: [id], onDelete: SetNull)
 
   // Optional “gov style” metadata
   ownerTeam          String?
@@ -114,4 +123,21 @@ model ContentRevision {
   createdAt DateTime @default(now())
 
   @@unique([itemId, revisionNumber])
+}
+
+model ReviewFeedback {
+  id     String      @id @default(uuid())
+  itemId String
+  item   ContentItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  message         String
+  createdAt       DateTime @default(now())
+  createdByUserId String?
+  createdBy       AppUser? @relation("FeedbackCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+  resolvedBy       AppUser?  @relation("FeedbackResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, createdAt])
 }

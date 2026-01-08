@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export default async function HomePage() {
   const items = await prisma.contentItem.findMany({
     where: { status: "PUBLISHED" },
-    orderBy: [{ publishedAt: "desc" }, { updatedAt: "desc" }],
+    orderBy: { publishedAt: "desc" },
     select: {
       id: true,
       type: true,
@@ -25,10 +25,13 @@ export default async function HomePage() {
           {items.map((it) => {
             const data = (it.currentRevision?.data as any) ?? {};
             const title = data.title ?? it.slug;
+
             return (
               <li key={it.id}>
                 <Link href={`/content/${it.slug}`}>{title}</Link>{" "}
-                <span style={{ opacity: 0.7 }}>({it.type})</span>
+                <span style={{ opacity: 0.7 }}>
+                  ({it.type})
+                </span>
               </li>
             );
           })}
