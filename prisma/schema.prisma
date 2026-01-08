@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// RBAC
+//
+
+enum RoleName {
+  AUTHOR
+  EDITOR
+  PUBLISHER
+  ADMIN
+}
+
+model AppUser {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // RBAC join
+  roles AppUserRole[]
+
+  // Content authored by this user
+  contentItemsCreated     ContentItem[]     @relation("ContentCreatedBy")
+  contentRevisionsCreated ContentRevision[] @relation("RevisionCreatedBy")
+}
+
+model Role {
+  id   Int      @id @default(autoincrement())
+  name RoleName @unique
+
+  users AppUserRole[]
+}
+
+model AppUserRole {
+  userId String
+  roleId Int
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+//
+// CONTENT
+//
+
+enum ContentType {
+  NEWS
+  POLICY
+  SERVICE
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+model ContentItem {
+  id     String        @id @default(uuid())
+  type   ContentType
+  slug   String        @unique
+  status ContentStatus @default(DRAFT)
+
+  // Optional “gov style” metadata
+  ownerTeam          String?
+  reviewDate         DateTime?
+  publishedAt        DateTime?
+  scheduledPublishAt DateTime?
+
+  createdByUserId String?
+  createdBy       AppUser? @relation("ContentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  // Pointer to the current revision
+  currentRevisionId String?          @unique
+  currentRevision   ContentRevision? @relation("CurrentRevision", fields: [currentRevisionId], references: [id], onDelete: SetNull)
+
+  // All revisions
+  revisions ContentRevision[] @relation("ItemRevisions")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ContentRevision {
+  id String @id @default(uuid())
+
+  itemId String
+  item   ContentItem @relation("ItemRevisions", fields: [itemId], references: [id], onDelete: Cascade)
+
+  // Opposite side of ContentItem.currentRevision
+  currentFor ContentItem? @relation("CurrentRevision")
+
+  revisionNumber Int
+  changeSummary  String?
+  data           Json
+
+  createdByUserId String?
+  createdBy       AppUser? @relation("RevisionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([itemId, revisionNumber])
+}
